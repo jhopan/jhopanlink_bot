@@ -27,11 +27,13 @@ Bot Telegram yang menyediakan layanan **short link dengan custom domain** dan **
 ## 🎯 Demo
 
 **Before:**
+
 ```
 ❌ https://docs.google.com/forms/d/e/1FAIpQLScXYZ123.../viewform?usp=sf_link
 ```
 
 **After:**
+
 ```
 ✅ https://s.jhopan.id/DaftarKepengurusan2025
 ✅ https://pmkft.jhopan.id/Daftar
@@ -61,11 +63,12 @@ cd jhopanlink_bot
 ### 2️⃣ Run Install Script
 
 ```bash
-chmod +x install.sh
-./install.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 ```
 
 Script akan otomatis:
+
 - ✅ Install Python dependencies
 - ✅ Setup virtual environment
 - ✅ Konfigurasi `.env` (interaktif)
@@ -86,6 +89,7 @@ nano ~/.cloudflared/config.yml
 ```
 
 **Config example:**
+
 ```yaml
 tunnel: YOUR_TUNNEL_ID
 credentials-file: /home/username/.cloudflared/YOUR_TUNNEL_ID.json
@@ -104,12 +108,14 @@ cloudflared tunnel route dns shortlink s.yourdomain.com
 ### 4️⃣ Start Bot
 
 **Option A: Simple Start (Foreground)**
+
 ```bash
 chmod +x scripts/start.sh
 ./scripts/start.sh
 ```
 
 **Option B: Run as Systemd Service (Production)**
+
 ```bash
 sudo ./scripts/install-service.sh
 sudo systemctl start jhopanlink-bot
@@ -118,6 +124,7 @@ sudo systemctl enable jhopanlink-bot  # Auto-start on boot
 ```
 
 **Option C: Create Shortcuts (Recommended)**
+
 ```bash
 ./scripts/create-aliases.sh
 source ~/.bashrc
@@ -152,6 +159,7 @@ jhopanlink_bot/
 ├── web/
 │   └── server.py           # Flask web server (redirect handler)
 ├── scripts/
+│   ├── install.sh          # Main installation script
 │   ├── start.sh            # Start bot (simple)
 │   ├── install-service.sh  # Install as systemd service
 │   ├── create-aliases.sh   # Create command shortcuts
@@ -159,7 +167,6 @@ jhopanlink_bot/
 │   └── stop_all.sh         # Stop all services
 ├── .env.example            # Environment variables template
 ├── requirements.txt        # Python dependencies
-├── install.sh              # Main installation script
 └── run.py                  # Run bot + web server
 ```
 
@@ -167,17 +174,17 @@ jhopanlink_bot/
 
 ## 🎮 Bot Commands
 
-| Command | Description |
-|---------|-------------|
-| `/start` | Mulai menggunakan bot |
-| `/help` | Lihat panduan penggunaan |
-| `/about` | Info tentang bot |
-| `/short <url> [alias]` | Buat short link |
-| `/qr <url>` | Generate QR code |
-| `/both <url> [alias]` | Short link + QR code |
-| `/stats` | Lihat statistik Anda |
-| `/mylinks` | Daftar semua link Anda |
-| `/adddomain <domain>` | Tambah custom domain |
+| Command                | Description              |
+| ---------------------- | ------------------------ |
+| `/start`               | Mulai menggunakan bot    |
+| `/help`                | Lihat panduan penggunaan |
+| `/about`               | Info tentang bot         |
+| `/short <url> [alias]` | Buat short link          |
+| `/qr <url>`            | Generate QR code         |
+| `/both <url> [alias]`  | Short link + QR code     |
+| `/stats`               | Lihat statistik Anda     |
+| `/mylinks`             | Daftar semua link Anda   |
+| `/adddomain <domain>`  | Tambah custom domain     |
 
 **Auto-detect URL:** Kirim URL langsung tanpa command untuk short link otomatis.
 
@@ -263,12 +270,14 @@ Setelah bot jalan, akses web interface:
 - **Public:** https://s.yourdomain.com
 
 **Features:**
+
 - Homepage dengan statistik total
 - API endpoint untuk membuat link
 - Auto redirect untuk short links
 - Custom domain support
 
 **API Example:**
+
 ```bash
 curl -X POST http://localhost:5000/api/create \
   -H "Content-Type: application/json" \
@@ -286,6 +295,7 @@ curl -X POST http://localhost:5000/api/create \
 SQLite database dengan 3 tabel:
 
 ### `short_links`
+
 - `id` - Primary key
 - `short_code` - 6-char unique code
 - `original_url` - Target URL
@@ -296,12 +306,14 @@ SQLite database dengan 3 tabel:
 - `clicks` - Click counter
 
 ### `custom_domains`
+
 - `id` - Primary key
 - `domain` - Domain name
 - `user_id` - Owner user ID
 - `added_at` - Timestamp
 
 ### `click_logs`
+
 - `id` - Primary key
 - `link_id` - Foreign key to short_links
 - `clicked_at` - Timestamp
@@ -323,6 +335,7 @@ SQLite database dengan 3 tabel:
 ## 🐛 Troubleshooting
 
 ### Bot tidak start
+
 ```bash
 # Check logs
 tail -f logs/bot.log
@@ -336,6 +349,7 @@ pip install -r requirements.txt
 ```
 
 ### Web server error
+
 ```bash
 # Check port
 sudo lsof -i :5000
@@ -348,6 +362,7 @@ python run.py
 ```
 
 ### Cloudflare Tunnel error
+
 ```bash
 # Check tunnel
 cloudflared tunnel list
@@ -360,6 +375,7 @@ cloudflared tunnel run shortlink
 ```
 
 ### Module not found error
+
 ```bash
 # Run with correct path
 export PYTHONPATH=/path/to/jhopanlink_bot:$PYTHONPATH
@@ -373,6 +389,7 @@ python run.py
 ### Recommended Setup
 
 1. **Install as systemd service** (auto-restart, auto-start on boot)
+
 ```bash
 sudo ./scripts/install-service.sh
 sudo systemctl enable jhopanlink-bot
@@ -380,11 +397,13 @@ sudo systemctl enable jhopanlink-tunnel
 ```
 
 2. **Create aliases** for easy management
+
 ```bash
 ./scripts/create-aliases.sh
 ```
 
 3. **Setup log rotation** (optional)
+
 ```bash
 sudo nano /etc/logrotate.d/jhopanlink
 ```
@@ -401,6 +420,7 @@ sudo nano /etc/logrotate.d/jhopanlink
 ```
 
 4. **Monitor with systemd**
+
 ```bash
 # Auto-restart on failure
 sudo systemctl status jhopanlink-bot
@@ -438,6 +458,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👤 Author
 
 **Jhopan**
+
 - GitHub: [@jhopan](https://github.com/jhopan)
 - Domain: [jhopan.id](https://jhopan.id)
 
@@ -455,6 +476,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📮 Support
 
 Jika ada pertanyaan atau butuh bantuan:
+
 - 🐛 [Open an issue](https://github.com/jhopan/jhopanlink_bot/issues)
 - 💬 [Discussions](https://github.com/jhopan/jhopanlink_bot/discussions)
 

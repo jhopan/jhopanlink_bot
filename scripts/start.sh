@@ -27,14 +27,14 @@ echo ""
 # Check virtual environment
 if [ ! -d "venv" ]; then
     echo -e "${RED}❌ Virtual environment not found!${NC}"
-    echo -e "${YELLOW}Run: ./install.sh first${NC}"
+    echo -e "${YELLOW}Run: ./scripts/install.sh first${NC}"
     exit 1
 fi
 
 # Check .env file
 if [ ! -f ".env" ]; then
     echo -e "${RED}❌ Configuration file (.env) not found!${NC}"
-    echo -e "${YELLOW}Run: ./install.sh first${NC}"
+    echo -e "${YELLOW}Run: ./scripts/install.sh first${NC}"
     exit 1
 fi
 
