@@ -388,7 +388,7 @@ EOF
     echo "  sudo systemctl start linkhub-bot"
 else
     print_info "Skipping systemd setup"
-    print_info "You can start manually using ./start_all.sh"
+    print_info "You can start manually using ./scripts/start.sh"
 fi
 
 echo ""
@@ -422,7 +422,7 @@ if [[ $SETUP_SYSTEMD =~ ^[Yy]$ ]]; then
     echo "   sudo systemctl status linkhub-web"
     echo "   sudo systemctl status linkhub-bot"
 else
-    echo "   ./start_all.sh"
+    echo "   ./scripts/start.sh"
 fi
 echo ""
 
@@ -442,8 +442,8 @@ echo ""
 
 print_info "Useful Commands:"
 echo "  View logs: tail -f logs/bot.log logs/webserver.log"
-echo "  Check status: ./check_status.sh"
-echo "  Stop services: ./stop_all.sh"
+echo "  Check status: ./scripts/check_status.sh"
+echo "  Stop services: ./scripts/stop_all.sh"
 echo ""
 
 print_info "Documentation:"
