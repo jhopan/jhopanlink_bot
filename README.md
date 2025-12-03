@@ -205,9 +205,6 @@ WEB_PORT=5000
 # Domain Settings
 DEFAULT_DOMAIN=jhopan.id
 DEFAULT_SUBDOMAIN=s
-
-# API Keys (Optional)
-TINYURL_API_KEY=your_api_key_here
 ```
 
 ---

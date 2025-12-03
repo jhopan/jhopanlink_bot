@@ -96,10 +96,14 @@ print_success "All system dependencies installed!"
 echo ""
 
 #######################################################
-# Step 2: Get Current Directory
+# Step 2: Get Project Root Directory
 #######################################################
 
-INSTALL_DIR=$(pwd)
+# Get script directory and move to parent (project root)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$INSTALL_DIR"
+
 print_info "Installation directory: $INSTALL_DIR"
 echo ""
 
@@ -204,24 +208,18 @@ if [ -z "$CONFIG_DONE" ]; then
     read -p "🔌 Enter web server port [default: 5000]: " WEB_PORT
     WEB_PORT=${WEB_PORT:-5000}
 
-    # TinyURL API Key (optional)
-    read -p "🔑 Enter TinyURL API Key (optional, press Enter to skip): " TINYURL_KEY
-
     # Create .env file
     cat > .env << EOF
 # Telegram Bot Configuration
 BOT_TOKEN=$BOT_TOKEN
 
 # Web Server Configuration
-WEB_SERVER_HOST=0.0.0.0
-WEB_SERVER_PORT=$WEB_PORT
+WEB_HOST=0.0.0.0
+WEB_PORT=$WEB_PORT
 
 # Default Domain for Short Link
 DEFAULT_DOMAIN=$DEFAULT_DOMAIN
 DEFAULT_SUBDOMAIN=$DEFAULT_SUBDOMAIN
-
-# TinyURL API Key (Optional)
-TINYURL_API_KEY=$TINYURL_KEY
 
 # Database
 DATABASE_URL=sqlite:///shortlink.db

@@ -13,15 +13,12 @@ class Config:
     # Bot Configuration
     BOT_TOKEN = os.getenv('BOT_TOKEN')
     
-    # Short Link API
-    TINYURL_API_KEY = os.getenv('TINYURL_API_KEY', '')
-    
     # Database
-    DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///bot_data.db')
+    DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///shortlink.db')
     
-    # Web Server Configuration
-    WEB_SERVER_HOST = os.getenv('WEB_SERVER_HOST', '0.0.0.0')
-    WEB_SERVER_PORT = int(os.getenv('WEB_SERVER_PORT', '5000'))
+    # Web Server Configuration  
+    WEB_HOST = os.getenv('WEB_HOST', '0.0.0.0')
+    WEB_PORT = int(os.getenv('WEB_PORT', '5000'))
     
     # Default Domain untuk Short Link
     DEFAULT_DOMAIN = os.getenv('DEFAULT_DOMAIN', 'jhopan.id')
