@@ -19,8 +19,9 @@ echo -e "🔧 Creating Command Aliases"
 echo -e "==========================================${NC}"
 echo ""
 
-# Get installation directory
-INSTALL_DIR="$(dirname "$(readlink -f "$0")")"
+# Get project root directory (parent of scripts/)
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Detect shell
 SHELL_RC=""
@@ -54,7 +55,7 @@ echo -e "${GREEN}Adding aliases to ${SHELL_RC}...${NC}"
 cat >> "$SHELL_RC" << EOF
 
 # JhopanLink Bot Aliases
-alias jlink-start='cd $INSTALL_DIR && ./start.sh'
+alias jlink-start='cd $INSTALL_DIR && ./scripts/start.sh'
 alias jlink-stop='cd $INSTALL_DIR && pkill -f "python.*run.py" || echo "Not running"'
 alias jlink-restart='jlink-stop && sleep 2 && jlink-start'
 alias jlink-logs='tail -f $INSTALL_DIR/logs/bot.log'

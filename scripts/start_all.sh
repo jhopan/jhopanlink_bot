@@ -7,9 +7,10 @@ echo "=========================================="
 echo "🚀 Starting ShortLink Bot System"
 echo "=========================================="
 
-# Get script directory
+# Get project root directory (parent of scripts/)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
