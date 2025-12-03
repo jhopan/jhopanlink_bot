@@ -127,10 +127,38 @@ echo ""
 
 echo -e "${BLUE}[3/8] Installing Python packages...${NC}"
 
-pip install --upgrade pip > /dev/null 2>&1
-pip install -r requirements.txt
+# Upgrade pip first
+pip install --upgrade pip setuptools wheel > /dev/null 2>&1
 
-print_success "Python packages installed!"
+# Install dependencies with better error handling
+if pip install -r requirements.txt; then
+    print_success "Python packages installed!"
+else
+    print_error "Failed to install some packages!"
+    print_info "Trying with alternative versions..."
+    
+    # Create alternative requirements
+    cat > requirements-alt.txt << 'ALTEOF'
+python-telegram-bot>=20.0
+python-dotenv>=1.0.0
+qrcode[pil]>=7.0
+requests>=2.31.0
+Pillow>=10.0.0
+aiohttp>=3.9.0
+Flask>=3.0.0
+Flask-CORS>=4.0.0
+ALTEOF
+    
+    if pip install -r requirements-alt.txt; then
+        print_success "Python packages installed with alternative versions!"
+        rm requirements-alt.txt
+    else
+        print_error "Installation failed! Please install packages manually"
+        deactivate
+        exit 1
+    fi
+fi
+
 echo ""
 
 #######################################################
