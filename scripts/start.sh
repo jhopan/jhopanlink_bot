@@ -38,6 +38,64 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
+# Load .env and check critical variables
+source .env
+
+# Check BOT_TOKEN
+if [ -z "$BOT_TOKEN" ] || [ "$BOT_TOKEN" = "your_bot_token_here" ]; then
+    echo -e "${RED}❌ BOT_TOKEN tidak ditemukan atau belum diset!${NC}"
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}📋 CARA MENDAPATKAN BOT TOKEN:${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "1️⃣  Buka Telegram dan cari: @BotFather"
+    echo "2️⃣  Kirim command: /newbot"
+    echo "3️⃣  Ikuti instruksi:"
+    echo "    - Nama bot: JhopanLink Bot (atau nama lain)"
+    echo "    - Username: jhopanlink_bot (harus unik)"
+    echo "4️⃣  Copy token yang diberikan"
+    echo "5️⃣  Edit file .env:"
+    echo "    nano .env"
+    echo "    Ganti: BOT_TOKEN=paste_token_disini"
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 1
+fi
+
+# Check if Cloudflare Tunnel is running
+echo -e "${BLUE}🔍 Checking services...${NC}"
+echo ""
+
+if ! pgrep -f "cloudflared.*tunnel" > /dev/null; then
+    echo -e "${YELLOW}⚠️  Cloudflare Tunnel tidak berjalan!${NC}"
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}🔧 SHORT LINK AKAN TETAP BERFUNGSI TAPI:${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "• Link hanya bisa diakses dari localhost"
+    echo "• Domain custom (s.$DEFAULT_DOMAIN) tidak akan berfungsi"
+    echo "• Bot akan fallback ke TinyURL untuk short link"
+    echo ""
+    echo -e "${GREEN}💡 Untuk mengaktifkan domain custom:${NC}"
+    echo ""
+    echo "   Buka terminal baru dan jalankan:"
+    echo -e "   ${BLUE}cloudflared tunnel run shortlink${NC}"
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    read -p "Lanjutkan tanpa Cloudflare Tunnel? (y/n): " CONTINUE
+    if [ "$CONTINUE" != "y" ]; then
+        echo -e "${BLUE}Exiting... Start Cloudflare Tunnel dulu!${NC}"
+        exit 0
+    fi
+else
+    echo -e "${GREEN}✅ Cloudflare Tunnel: Running${NC}"
+fi
+
+echo ""
+
 # Create logs directory
 mkdir -p logs
 

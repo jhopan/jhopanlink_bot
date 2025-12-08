@@ -13,6 +13,9 @@ class Config:
     # Bot Configuration
     BOT_TOKEN = os.getenv('BOT_TOKEN')
     
+    # TinyURL Fallback (when web server is down)
+    TINYURL_API_KEY = os.getenv('TINYURL_API_KEY', '')
+    
     # Database
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///shortlink.db')
     

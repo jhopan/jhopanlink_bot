@@ -7,6 +7,7 @@ from src.utils import QRCodeGenerator, ShortLinkGenerator
 from config.config import Config
 from database.db_manager import DatabaseManager
 import re
+import aiohttp
 
 # Initialize generators
 qr_gen = QRCodeGenerator(
@@ -14,10 +15,21 @@ qr_gen = QRCodeGenerator(
     border=Config.QR_BORDER,
     error_correction=Config.QR_ERROR_CORRECTION
 )
-short_gen = ShortLinkGenerator(api_key=Config.TINYURL_API_KEY)
 
 # Initialize database
 db = DatabaseManager()
+
+async def check_web_server_status():
+    """Check if web server is running"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"http://localhost:{Config.WEB_PORT}/api/health",
+                timeout=aiohttp.ClientTimeout(total=2)
+            ) as response:
+                return response.status == 200
+    except:
+        return False
 
 def is_url(text: str) -> bool:
     """Check if text is a URL"""
@@ -77,40 +89,66 @@ async def short_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     try:
-        # Create short link in database
-        result = db.create_short_link(
-            original_url=url,
-            custom_alias=custom_alias,
-            domain=custom_domain,
-            user_id=user_id
-        )
+        # Check if web server is running
+        web_server_online = await check_web_server_status()
         
-        if result['success']:
-            # Build short URL
-            if custom_domain == 'default':
-                domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
+        if web_server_online:
+            # Use custom domain (primary)
+            result = db.create_short_link(
+                original_url=url,
+                custom_alias=custom_alias,
+                domain=custom_domain,
+                user_id=user_id
+            )
+            
+            if result['success']:
+                # Build short URL
+                if custom_domain == 'default':
+                    domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
+                else:
+                    domain_name = custom_domain
+                
+                short_code = result['custom_alias'] or result['short_code']
+                short_url = f"https://{domain_name}/{short_code}"
+                
+                await processing_msg.edit_text(
+                    "✅ *Short Link berhasil dibuat!*\n\n"
+                    f"🔗 *URL Asli:*\n`{url[:60]}{'...' if len(url) > 60 else ''}`\n\n"
+                    f"✨ *Short Link:*\n`{short_url}`\n\n"
+                    f"📊 *Stats:* 0 clicks\n\n"
+                    "━━━━━━━━━━━━━━━━━\n"
+                    "💡 *Tip:* Gunakan `/mystats` untuk lihat semua link Anda!",
+                    parse_mode='Markdown'
+                )
             else:
-                domain_name = custom_domain
-            
-            short_code = result['custom_alias'] or result['short_code']
-            short_url = f"https://{domain_name}/{short_code}"
-            
-            await processing_msg.edit_text(
-                "✅ *Short Link berhasil dibuat!*\n\n"
-                f"🔗 *URL Asli:*\n`{url[:60]}{'...' if len(url) > 60 else ''}`\n\n"
-                f"✨ *Short Link:*\n`{short_url}`\n\n"
-                f"📊 *Stats:* 0 clicks\n\n"
-                "━━━━━━━━━━━━━━━━━\n"
-                "💡 *Tip:* Gunakan `/mystats` untuk lihat semua link Anda!",
-                parse_mode='Markdown'
-            )
+                await processing_msg.edit_text(
+                    f"❌ *Gagal membuat short link!*\n\n"
+                    f"Error: {result.get('error', 'Unknown error')}\n\n"
+                    "Silakan coba alias lain atau hubungi admin.",
+                    parse_mode='Markdown'
+                )
         else:
-            await processing_msg.edit_text(
-                f"❌ *Gagal membuat short link!*\n\n"
-                f"Error: {result.get('error', 'Unknown error')}\n\n"
-                "Silakan coba alias lain atau hubungi admin.",
-                parse_mode='Markdown'
-            )
+            # Fallback to TinyURL
+            short_gen = ShortLinkGenerator()
+            short_url = await short_gen.shorten(url, custom_alias)
+            
+            if short_url:
+                await processing_msg.edit_text(
+                    "✅ *Short Link berhasil dibuat (via TinyURL)!*\n\n"
+                    f"🔗 *URL Asli:*\n`{url[:60]}{'...' if len(url) > 60 else ''}`\n\n"
+                    f"✨ *Short Link:*\n`{short_url}`\n\n"
+                    "⚠️ *Note:* Web server sedang offline, menggunakan TinyURL sebagai backup.\n\n"
+                    "━━━━━━━━━━━━━━━━━\n"
+                    "💡 Hubungi admin untuk mengaktifkan domain custom!",
+                    parse_mode='Markdown'
+                )
+            else:
+                await processing_msg.edit_text(
+                    "❌ *Gagal membuat short link!*\n\n"
+                    "Web server offline dan TinyURL juga gagal.\n"
+                    "Silakan coba lagi nanti atau hubungi admin.",
+                    parse_mode='Markdown'
+                )
     
     except Exception as e:
         await processing_msg.edit_text(
@@ -268,24 +306,55 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         
         try:
-            # Generate short link
-            short_url = await short_gen.shorten(text)
+            url = text if text.startswith(('http://', 'https://')) else 'https://' + text
+            user_id = str(update.effective_user.id)
             
-            if short_url != text:
-                await processing_msg.edit_text(
-                    "✅ *Short Link berhasil dibuat!*\n\n"
-                    f"🔗 *URL Asli:*\n`{text}`\n\n"
-                    f"✨ *Short Link:*\n`{short_url}`\n\n"
-                    "━━━━━━━━━━━━━━━━━\n"
-                    "💡 *Tip:* Gunakan `/both <URL>` untuk mendapatkan QR Code juga!",
-                    parse_mode='Markdown'
+            # Check if web server is running
+            web_server_online = await check_web_server_status()
+            
+            if web_server_online:
+                # Use custom domain
+                result = db.create_short_link(
+                    original_url=url,
+                    user_id=user_id
                 )
+                
+                if result['success']:
+                    domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
+                    short_code = result['short_code']
+                    short_url = f"https://{domain_name}/{short_code}"
+                    
+                    await processing_msg.edit_text(
+                        "✅ *Short Link berhasil dibuat!*\n\n"
+                        f"🔗 *URL Asli:*\n`{text}`\n\n"
+                        f"✨ *Short Link:*\n`{short_url}`\n\n"
+                        "━━━━━━━━━━━━━━━━━\n"
+                        "💡 *Tip:* Gunakan `/both <URL>` untuk mendapatkan QR Code juga!",
+                        parse_mode='Markdown'
+                    )
+                else:
+                    raise Exception("Database error")
             else:
-                await processing_msg.edit_text(
-                    "❌ Gagal membuat short link.\n\n"
-                    "Gunakan `/short <URL>` atau `/help` untuk bantuan.",
-                    parse_mode='Markdown'
-                )
+                # Fallback to TinyURL
+                short_gen = ShortLinkGenerator()
+                short_url = await short_gen.shorten(url)
+                
+                if short_url and short_url != url:
+                    await processing_msg.edit_text(
+                        "✅ *Short Link berhasil dibuat (via TinyURL)!*\n\n"
+                        f"🔗 *URL Asli:*\n`{text}`\n\n"
+                        f"✨ *Short Link:*\n`{short_url}`\n\n"
+                        "⚠️ *Note:* Web server offline, menggunakan backup.\n"
+                        "━━━━━━━━━━━━━━━━━\n"
+                        "💡 *Tip:* Gunakan `/both <URL>` untuk mendapatkan QR Code juga!",
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await processing_msg.edit_text(
+                        "❌ Gagal membuat short link.\n\n"
+                        "Silakan coba lagi nanti.",
+                        parse_mode='Markdown'
+                    )
         
         except Exception as e:
             await processing_msg.edit_text(

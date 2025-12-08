@@ -208,6 +208,14 @@ if [ -z "$CONFIG_DONE" ]; then
     read -p "🔌 Enter web server port [default: 5000]: " WEB_PORT
     WEB_PORT=${WEB_PORT:-5000}
 
+    # TinyURL API Key (optional fallback)
+    echo ""
+    echo "🔄 TinyURL Fallback (Optional):"
+    echo "   - TinyURL akan digunakan sebagai backup jika web server Anda mati"
+    echo "   - Gratis, dapatkan API key di: https://tinyurl.com/app/dev"
+    echo "   - Tekan Enter untuk skip (tidak wajib)"
+    read -p "🔑 Enter TinyURL API Key (optional): " TINYURL_KEY
+
     # Create .env file
     cat > .env << EOF
 # Telegram Bot Configuration
@@ -220,6 +228,9 @@ WEB_PORT=$WEB_PORT
 # Default Domain for Short Link
 DEFAULT_DOMAIN=$DEFAULT_DOMAIN
 DEFAULT_SUBDOMAIN=$DEFAULT_SUBDOMAIN
+
+# TinyURL API Key (Optional - Fallback when web server down)
+TINYURL_API_KEY=$TINYURL_KEY
 
 # Database
 DATABASE_URL=sqlite:///shortlink.db
@@ -304,13 +315,45 @@ if [[ $SETUP_TUNNEL =~ ^[Yy]$ ]]; then
     
     if [ -z "$TUNNEL_SKIP" ]; then
         echo ""
-        print_info "Next steps for Cloudflare Tunnel:"
-        echo "1. Run: cloudflared tunnel login"
-        echo "2. Run: cloudflared tunnel create linkhub"
-        echo "3. Configure tunnel (see SETUP_GUIDE.md)"
+        print_info "🚀 Next: Setup Cloudflare Tunnel"
         echo ""
-        print_warning "Please complete Cloudflare setup manually"
-        print_info "See SETUP_GUIDE.md for detailed instructions"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📋 LANGKAH SETUP CLOUDFLARE TUNNEL:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "1️⃣  Login ke Cloudflare:"
+        echo "    cloudflared tunnel login"
+        echo "    (Browser akan terbuka, pilih domain: $DEFAULT_DOMAIN)"
+        echo ""
+        echo "2️⃣  Buat tunnel baru:"
+        echo "    cloudflared tunnel create shortlink"
+        echo "    (Simpan TUNNEL_ID yang muncul!)"
+        echo ""
+        echo "3️⃣  Buat config file:"
+        echo "    mkdir -p ~/.cloudflared"
+        echo "    nano ~/.cloudflared/config.yml"
+        echo ""
+        echo "    Isi config:"
+        echo "    ----------------------------------------"
+        echo "    tunnel: YOUR_TUNNEL_ID"
+        echo "    credentials-file: /home/$(whoami)/.cloudflared/YOUR_TUNNEL_ID.json"
+        echo ""
+        echo "    ingress:"
+        echo "      - hostname: $DEFAULT_SUBDOMAIN.$DEFAULT_DOMAIN"
+        echo "        service: http://localhost:$WEB_PORT"
+        echo "      - service: http_status:404"
+        echo "    ----------------------------------------"
+        echo ""
+        echo "4️⃣  Route DNS ke tunnel:"
+        echo "    cloudflared tunnel route dns shortlink $DEFAULT_SUBDOMAIN.$DEFAULT_DOMAIN"
+        echo ""
+        echo "5️⃣  Test tunnel:"
+        echo "    cloudflared tunnel run shortlink"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "💡 Setelah tunnel jalan, buka tab baru untuk start bot!"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
     fi
 else
     print_info "Skipping Cloudflare Tunnel setup"
