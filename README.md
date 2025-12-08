@@ -75,9 +75,17 @@ Script akan otomatis:
 - ✅ Setup virtual environment
 - ✅ Konfigurasi `.env` (interaktif)
 - ✅ Inisialisasi database SQLite
-- ✅ Setup Cloudflare Tunnel
+- ✅ Setup TinyURL fallback (optional)
 
-### 3️⃣ Setup Cloudflare Tunnel
+**Saat instalasi, Anda akan ditanya:**
+
+1. **Bot Token** - Dari @BotFather (wajib)
+2. **Domain** - Kosongkan untuk TinyURL-only, atau:
+   - Domain gratis: `namaanda.duckdns.org`
+   - Domain sendiri: `jhopan.id`
+3. **TinyURL API Key** - Optional (tekan Enter untuk skip)
+
+### 3️⃣ Setup Cloudflare Tunnel (jika pakai domain sendiri)
 
 ```bash
 # Login ke Cloudflare
@@ -204,7 +212,41 @@ BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 WEB_HOST=0.0.0.0
 WEB_PORT=5000
 
-# Domain Settings
+# Domain Settings (OPSIONAL)
+# Kosongkan jika hanya pakai TinyURL
+# Domain gratis: duckdns.org (https://www.duckdns.org)
+DEFAULT_DOMAIN=
+DEFAULT_SUBDOMAIN=s
+
+# TinyURL API (Opsional - Fallback)
+TINYURL_API_KEY=your_tinyurl_api_key
+```
+
+### Domain Options
+
+**Opsi 1: Tanpa Domain (TinyURL Only)**
+
+Kosongkan `DEFAULT_DOMAIN`, bot akan otomatis pakai TinyURL:
+
+```env
+DEFAULT_DOMAIN=
+```
+
+**Opsi 2: Domain Gratis**
+
+Gunakan layanan domain gratis:
+
+- **DuckDNS** (Recommended): https://www.duckdns.org
+  - Gratis subdomain `.duckdns.org`
+  - Contoh: `jhopan.duckdns.org`
+- **Afraid.org**: https://freedns.afraid.org
+  - Banyak pilihan domain gratis
+
+**Opsi 3: Domain Sendiri**
+
+Jika punya domain berbayar (Namecheap, Cloudflare, dll):
+
+```env
 DEFAULT_DOMAIN=jhopan.id
 DEFAULT_SUBDOMAIN=s
 ```
@@ -325,29 +367,46 @@ SQLite database dengan 3 tabel:
 
 Bot ini punya sistem fallback otomatis untuk memastikan short link tetap berfungsi:
 
-### Primary: Custom Domain (s.jhopan.id)
-- ✅ Link pakai domain sendiri
+### Primary: Custom Domain (jika ada)
+
+- ✅ Link pakai domain sendiri (contoh: s.jhopan.id/xxx)
 - ✅ Full control & analytics
 - ✅ Custom alias support
 - ✅ No dependency ke third-party
 
 ### Fallback: TinyURL (Automatic)
-- 🔄 Aktif ketika web server mati
+
+- 🔄 Aktif ketika:
+  - Web server mati
+  - Tidak ada custom domain (DEFAULT_DOMAIN kosong)
 - 🔄 Bot auto-detect server status
 - 🔄 Transparent untuk user
 - ⚠️ Link jadi `tinyurl.com/xxx`
 
 **Flow:**
+
 ```
-User → Bot → Check Web Server
-              ├─ ✅ Online  → s.jhopan.id/xxx (Primary)
-              └─ ❌ Offline → tinyurl.com/xxx (Fallback)
+User → Bot → Check Custom Domain
+              ├─ ✅ Ada Domain + Server Online  → s.jhopan.id/xxx (Primary)
+              ├─ ❌ Server Offline              → tinyurl.com/xxx (Fallback)
+              └─ ❌ No Domain                   → tinyurl.com/xxx (Fallback)
 ```
 
 **Setup TinyURL API Key (Optional):**
+
 1. Daftar gratis di: https://tinyurl.com/app/dev
 2. Dapatkan API key
-3. Tambahkan ke `.env`: `TINYURL_API_KEY=your_key`
+3. Tambahkan saat instalasi atau edit `.env`: `TINYURL_API_KEY=your_key`
+
+**Mode TinyURL-Only:**
+
+Jika tidak punya domain, kosongkan saja `DEFAULT_DOMAIN`:
+
+```env
+DEFAULT_DOMAIN=
+```
+
+Bot akan selalu pakai TinyURL (tanpa web server).
 
 ---
 

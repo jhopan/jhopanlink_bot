@@ -196,13 +196,23 @@ if [ -z "$CONFIG_DONE" ]; then
         fi
     done
 
-    # Default Domain
-    read -p "🌐 Enter your domain (e.g., jhopan.id) [default: jhopan.id]: " DEFAULT_DOMAIN
-    DEFAULT_DOMAIN=${DEFAULT_DOMAIN:-jhopan.id}
-
-    # Default Subdomain
-    read -p "🔗 Enter your subdomain prefix (e.g., s for s.jhopan.id) [default: s]: " DEFAULT_SUBDOMAIN
-    DEFAULT_SUBDOMAIN=${DEFAULT_SUBDOMAIN:-s}
+    # Default Domain Configuration
+    echo ""
+    echo -e "${BLUE}Domain Configuration (Optional):${NC}"
+    echo "  ℹ️  Anda bisa menggunakan domain sendiri atau domain gratis"
+    echo "  ℹ️  Domain gratis: DuckDNS (https://www.duckdns.org)"
+    echo "  ℹ️  Atau kosongkan jika hanya ingin pakai TinyURL"
+    echo ""
+    read -p "🌐 Enter your domain (e.g., jhopan.duckdns.org) [kosongkan = TinyURL only]: " DEFAULT_DOMAIN
+    
+    if [ -n "$DEFAULT_DOMAIN" ]; then
+        # Default Subdomain
+        read -p "🔗 Enter your subdomain prefix (e.g., s for s.jhopan.id) [default: s]: " DEFAULT_SUBDOMAIN
+        DEFAULT_SUBDOMAIN=${DEFAULT_SUBDOMAIN:-s}
+    else
+        DEFAULT_SUBDOMAIN=""
+        echo "  ⚠️  Tidak ada domain, bot akan menggunakan TinyURL"
+    fi
 
     # Web Server Port
     read -p "🔌 Enter web server port [default: 5000]: " WEB_PORT
@@ -444,6 +454,9 @@ echo "     ✅ Installation Complete!"
 echo "=============================================="
 echo -e "${NC}"
 echo ""
+
+# Read configuration from .env file for summary
+source .env 2>/dev/null
 
 print_info "Configuration Summary:"
 echo "  📁 Install Directory: $INSTALL_DIR"
