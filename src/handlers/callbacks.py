@@ -22,6 +22,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Route ke handler yang sesuai
     if callback_data == "menu_shortlink":
         await handle_shortlink_menu(query, context)
+    elif callback_data == "shortlink_default":
+        await handle_shortlink_default(query, context)
+    elif callback_data == "shortlink_custom":
+        await handle_shortlink_custom(query, context)
+    elif callback_data == "shortlink_tinyurl":
+        await handle_shortlink_tinyurl(query, context)
     elif callback_data == "menu_qr":
         await handle_qr_menu(query, context)
     elif callback_data == "menu_both":
@@ -38,28 +44,49 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await back_to_main_menu(query, context)
 
 async def handle_shortlink_menu(query, context: ContextTypes.DEFAULT_TYPE):
-    """Menu untuk membuat short link"""
+    """Menu untuk membuat short link dengan pilihan domain"""
     keyboard = [
-        [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")]
+        [
+            InlineKeyboardButton("🌐 Pakai Default Domain", callback_data="shortlink_default"),
+        ],
+        [
+            InlineKeyboardButton("🎯 Custom Domain/Subdomain", callback_data="shortlink_custom"),
+        ],
+        [
+            InlineKeyboardButton("📱 TinyURL (No Domain)", callback_data="shortlink_tinyurl")
+        ],
+        [
+            InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    message = """
+    # Get default domain info
+    default_domain = Config.DEFAULT_DOMAIN
+    subdomain = Config.DEFAULT_SUBDOMAIN
+    
+    if default_domain:
+        domain_info = f"`{subdomain}.{default_domain}`"
+    else:
+        domain_info = "_(Belum ada, akan pakai TinyURL)_"
+    
+    message = f"""
 🔗 *Short Link Generator*
 
-Silakan kirim URL yang ingin diperpendek.
+Pilih domain yang ingin digunakan:
 
-*Format:*
-Kirim URL saja → Random code
-`https://example.com/long/url`
+━━━━━━━━━━━━━━━━━
+🌐 *Default Domain*
+   Domain: {domain_info}
+   Gratis untuk semua user
 
-Kirim URL + spasi + alias → Custom alias
-`https://example.com myalias`
-
-*Contoh:*
-`https://forms.google.com/form/123456`
-atau
-`https://forms.google.com/form/123456 FormDaftar`
+🎯 *Custom Domain/Subdomain*
+   Pakai domain sendiri atau
+   request subdomain gratis
+   
+📱 *TinyURL*
+   Link via TinyURL.com
+   Tidak perlu domain
 
 ━━━━━━━━━━━━━━━━━
 Ketik /cancel untuk batal
@@ -71,8 +98,151 @@ Ketik /cancel untuk batal
         parse_mode='Markdown'
     )
     
-    # Set state: waiting for URL
-    context.user_data['state'] = 'waiting_shortlink_url'
+    # Clear state
+    context.user_data['state'] = None
+
+async def handle_shortlink_default(query, context: ContextTypes.DEFAULT_TYPE):
+    """User pilih default domain"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    default_domain = Config.DEFAULT_DOMAIN
+    subdomain = Config.DEFAULT_SUBDOMAIN
+    
+    if default_domain:
+        message = f"""
+🌐 *Short Link - Default Domain*
+
+Silakan kirim URL yang ingin diperpendek.
+Link akan dibuat dengan domain: `{subdomain}.{default_domain}`
+
+*Format:*
+Kirim URL saja → Random code
+`https://example.com/long/url`
+
+Kirim URL + spasi + alias → Custom alias
+`https://example.com myalias`
+
+*Contoh:*
+`https://forms.google.com/form/123456`
+Hasil: `{subdomain}.{default_domain}/abc123`
+
+atau dengan alias:
+`https://forms.google.com/form/123456 FormDaftar`
+Hasil: `{subdomain}.{default_domain}/FormDaftar`
+
+━━━━━━━━━━━━━━━━━
+Ketik /cancel untuk batal
+        """
+        context.user_data['state'] = 'waiting_shortlink_default'
+        context.user_data['domain_choice'] = 'default'
+    else:
+        message = """
+⚠️ *Default Domain Belum Tersedia*
+
+Domain default belum dikonfigurasi.
+Silakan pilih opsi lain:
+
+• 🎯 Custom Domain (hubungi admin)
+• 📱 TinyURL (langsung pakai)
+        """
+    
+    await query.edit_message_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def handle_shortlink_custom(query, context: ContextTypes.DEFAULT_TYPE):
+    """User mau pakai custom domain - perlu hubungi admin"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📩 Hubungi Admin", url="https://t.me/jhopan_05")
+        ],
+        [
+            InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    message = """
+🎯 *Custom Domain / Subdomain*
+
+Untuk menggunakan custom domain atau subdomain gratis, hubungi admin:
+
+━━━━━━━━━━━━━━━━━
+👤 *Admin:* @jhopan_05
+
+━━━━━━━━━━━━━━━━━
+*Pilihan Tersedia:*
+
+1️⃣ *Subdomain Gratis*
+   Pakai domain kami: `nama-anda.jhopan.my.id`
+   Gratis, setup oleh admin
+   
+2️⃣ *Custom Domain Sendiri*
+   Pakai domain Anda sendiri
+   Butuh setup DNS & Cloudflare
+
+━━━━━━━━━━━━━━━━━
+*Info:*
+• Subdomain gratis unlimited (via Cloudflare)
+• Proses setup 1-2 hari kerja
+• Include SSL/TLS certificate
+• Full analytics & tracking
+
+Klik tombol "📩 Hubungi Admin" untuk request!
+    """
+    
+    await query.edit_message_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def handle_shortlink_tinyurl(query, context: ContextTypes.DEFAULT_TYPE):
+    """User pilih TinyURL"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    message = """
+📱 *Short Link - TinyURL*
+
+Silakan kirim URL yang ingin diperpendek.
+Link akan dibuat via TinyURL.com
+
+*Format:*
+Kirim URL saja → Random code
+`https://example.com/long/url`
+
+Kirim URL + spasi + alias → Custom alias (jika tersedia)
+`https://example.com myalias`
+
+*Contoh:*
+`https://forms.google.com/form/123456`
+Hasil: `tinyurl.com/abc123`
+
+━━━━━━━━━━━━━━━━━
+⚠️ *Note:*
+• Analytics hanya di TinyURL
+• Tidak ada custom domain
+• Gratis dan cepat
+
+Ketik /cancel untuk batal
+    """
+    
+    await query.edit_message_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    
+    context.user_data['state'] = 'waiting_shortlink_tinyurl'
+    context.user_data['domain_choice'] = 'tinyurl'
 
 async def handle_qr_menu(query, context: ContextTypes.DEFAULT_TYPE):
     """Menu untuk membuat QR code"""

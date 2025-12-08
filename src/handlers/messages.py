@@ -67,8 +67,10 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     
     # Route based on state
-    if user_state == 'waiting_shortlink_url':
-        await process_shortlink_input(update, context, text)
+    if user_state == 'waiting_shortlink_default':
+        await process_shortlink_default(update, context, text)
+    elif user_state == 'waiting_shortlink_tinyurl':
+        await process_shortlink_tinyurl(update, context, text)
     elif user_state == 'waiting_qr_text':
         await process_qr_input(update, context, text)
     elif user_state == 'waiting_both_url':
@@ -78,8 +80,9 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         # Default: auto-detect URL
         if is_url(text):
-            context.user_data['state'] = 'waiting_shortlink_url'
-            await process_shortlink_input(update, context, text)
+            context.user_data['state'] = 'waiting_shortlink_default'
+            context.user_data['domain_choice'] = 'default'
+            await process_shortlink_default(update, context, text)
         else:
             await update.message.reply_text(
                 "❓ Tidak mengerti perintah Anda.\n\n"
@@ -87,8 +90,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 reply_markup=get_back_button()
             )
 
-async def process_shortlink_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    """Process short link creation from user input"""
+async def process_shortlink_default(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process short link dengan default domain"""
     # Parse input: URL atau URL + alias
     parts = text.split(maxsplit=1)
     url = parts[0]
@@ -100,7 +103,6 @@ async def process_shortlink_input(update: Update, context: ContextTypes.DEFAULT_
     
     user_id = str(update.effective_user.id)
     
-    # Send processing message
     processing_msg = await update.message.reply_text(
         "⏳ Sedang membuat short link...",
         parse_mode='Markdown'
@@ -151,11 +153,41 @@ Klik link untuk test redirect.
                 )
         else:
             # Fallback to TinyURL
-            shortlink_gen = ShortLinkGenerator()
-            short_url = shortlink_gen.create_tinyurl(url, custom_alias)
-            
-            if short_url:
-                message = f"""
+            await processing_msg.edit_text(
+                "⚠️ Default domain tidak tersedia.\n\n"
+                "Gunakan TinyURL atau hubungi admin untuk custom domain.",
+                reply_markup=get_back_button()
+            )
+    
+    except Exception as e:
+        await processing_msg.edit_text(
+            f"❌ Error: {str(e)}",
+            reply_markup=get_back_button()
+        )
+    
+    # Clear state
+    context.user_data['state'] = None
+
+async def process_shortlink_tinyurl(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process short link dengan TinyURL"""
+    parts = text.split(maxsplit=1)
+    url = parts[0]
+    custom_alias = parts[1] if len(parts) > 1 else None
+    
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    
+    processing_msg = await update.message.reply_text(
+        "⏳ Sedang membuat short link via TinyURL...",
+        parse_mode='Markdown'
+    )
+    
+    try:
+        shortlink_gen = ShortLinkGenerator()
+        short_url = shortlink_gen.create_tinyurl(url, custom_alias)
+        
+        if short_url:
+            message = f"""
 ✅ *Short Link Berhasil Dibuat!*
 
 ━━━━━━━━━━━━━━━━━
@@ -166,19 +198,19 @@ Klik link untuk test redirect.
 {url[:50]}{"..." if len(url) > 50 else ""}
 
 ━━━━━━━━━━━━━━━━━
-⚠️ *Note:* Web server offline, menggunakan TinyURL fallback
-                """
-                
-                await processing_msg.edit_text(
-                    message,
-                    parse_mode='Markdown',
-                    reply_markup=get_back_button()
-                )
-            else:
-                await processing_msg.edit_text(
-                    "❌ Gagal membuat short link dengan TinyURL!",
-                    reply_markup=get_back_button()
-                )
+📱 Link via TinyURL.com
+            """
+            
+            await processing_msg.edit_text(
+                message,
+                parse_mode='Markdown',
+                reply_markup=get_back_button()
+            )
+        else:
+            await processing_msg.edit_text(
+                "❌ Gagal membuat short link dengan TinyURL!",
+                reply_markup=get_back_button()
+            )
     
     except Exception as e:
         await processing_msg.edit_text(
@@ -186,7 +218,6 @@ Klik link untuk test redirect.
             reply_markup=get_back_button()
         )
     
-    # Clear state
     context.user_data['state'] = None
 
 async def process_qr_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
@@ -383,8 +414,9 @@ async def short_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         # If arguments provided, process directly
         text = ' '.join(context.args)
-        context.user_data['state'] = 'waiting_shortlink_url'
-        await process_shortlink_input(update, context, text)
+        context.user_data['state'] = 'waiting_shortlink_default'
+        context.user_data['domain_choice'] = 'default'
+        await process_shortlink_default(update, context, text)
     else:
         # Show usage
         await update.message.reply_text(

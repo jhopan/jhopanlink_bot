@@ -23,6 +23,7 @@ from src.handlers import (
     error_handler
 )
 from src.handlers.callbacks import button_callback
+from src.handlers.admin import admin_command, handle_admin_callback
 
 class TelegramBot:
     """Kelas utama untuk Bot Telegram"""
@@ -54,7 +55,11 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("mylinks", mylinks_command))
         self.application.add_handler(CommandHandler("adddomain", adddomain_command))
         
-        # Callback query handler (untuk inline keyboard buttons)
+        # Admin command
+        self.application.add_handler(CommandHandler("admin", admin_command))
+        
+        # Callback query handlers
+        self.application.add_handler(CallbackQueryHandler(handle_admin_callback, pattern="^admin_"))
         self.application.add_handler(CallbackQueryHandler(button_callback))
         
         # Message handler untuk text

@@ -369,3 +369,114 @@ class DatabaseManager:
         conn.close()
         
         return affected > 0
+    
+    # Admin methods
+    def get_total_links(self) -> int:
+        """Get total links count"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM short_links WHERE is_active = 1')
+        result = cursor.fetchone()[0]
+        conn.close()
+        return result
+    
+    def get_total_clicks(self) -> int:
+        """Get total clicks count"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT SUM(clicks) FROM short_links WHERE is_active = 1')
+        result = cursor.fetchone()[0] or 0
+        conn.close()
+        return result
+    
+    def get_total_users(self) -> int:
+        """Get total unique users"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(DISTINCT created_by) FROM short_links WHERE is_active = 1')
+        result = cursor.fetchone()[0]
+        conn.close()
+        return result
+    
+    def get_total_domains(self) -> int:
+        """Get total custom domains"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM custom_domains')
+        result = cursor.fetchone()[0]
+        conn.close()
+        return result
+    
+    def get_all_domains(self, limit: int = 50) -> List[Dict]:
+        """Get all custom domains"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT domain, user_id, username, added_at
+            FROM custom_domains
+            ORDER BY added_at DESC
+            LIMIT ?
+        ''', (limit,))
+        
+        domains = []
+        for row in cursor.fetchall():
+            domains.append({
+                'domain': row[0],
+                'user_id': row[1],
+                'username': row[2],
+                'added_at': row[3]
+            })
+        
+        conn.close()
+        return domains
+    
+    def get_recent_links(self, limit: int = 10) -> List[Dict]:
+        """Get recent links"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT short_code, original_url, custom_alias, domain, clicks, created_by, created_at
+            FROM short_links
+            WHERE is_active = 1
+            ORDER BY created_at DESC
+            LIMIT ?
+        ''', (limit,))
+        
+        links = []
+        for row in cursor.fetchall():
+            links.append({
+                'short_code': row[0],
+                'original_url': row[1],
+                'custom_alias': row[2],
+                'domain': row[3],
+                'clicks': row[4],
+                'user_id': row[5],
+                'created_at': row[6]
+            })
+        
+        conn.close()
+        return links
+    
+    def get_active_users(self, limit: int = 10) -> List[Dict]:
+        """Get active users with stats"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT created_by, COUNT(*) as link_count, SUM(clicks) as total_clicks
+            FROM short_links
+            WHERE is_active = 1
+            GROUP BY created_by
+            ORDER BY link_count DESC
+            LIMIT ?
+        ''', (limit,))
+        
+        users = []
+        for row in cursor.fetchall():
+            users.append({
+                'user_id': row[0],
+                'link_count': row[1],
+                'total_clicks': row[2] or 0
+            })
+        
+        conn.close()
+        return users
