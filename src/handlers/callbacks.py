@@ -32,6 +32,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_custom_domain_own(query, context)
     elif callback_data == "shortlink_tinyurl":
         await handle_shortlink_tinyurl(query, context)
+    elif callback_data == "alias_random":
+        await handle_alias_random(query, context)
+    elif callback_data == "alias_custom":
+        await handle_alias_custom(query, context)
     elif callback_data == "menu_qr":
         await handle_qr_menu(query, context)
     elif callback_data == "menu_both":
@@ -116,33 +120,41 @@ async def handle_shortlink_default(query, context: ContextTypes.DEFAULT_TYPE):
     subdomain = Config.DEFAULT_SUBDOMAIN
     
     if default_domain:
+        full_domain = f"{subdomain}.{default_domain}"
         message = f"""
 🌐 *Short Link - Default Domain*
 
-━━━━━━━━━━━━━━━━━
-📍 *Subdomain Aktif:* `{subdomain}`
-🌐 *Domain:* `{default_domain}`
-🔗 *Full URL:* `{subdomain}.{default_domain}`
+━━━━━━━━━━━━━━━━━━━━━━
+📍 *Subdomain Aktif*
+   `{subdomain}`
 
-━━━━━━━━━━━━━━━━━
+🌐 *Domain Utama*
+   `{default_domain}`
+
+🔗 *Full URL Domain*
+   `{full_domain}`
+
+✅ *Status*
+   Aktif dan siap digunakan
+
+⚡ *Fitur*
+   • SSL/TLS Enabled
+   • Cloudflare Protected
+   • Unlimited Short Links
+   • Custom Alias Support
+   • Analytics & Stats
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📤 *Cara Pakai:*
 Silakan kirim URL yang ingin diperpendek.
+Contoh: `https://example.com/long/url`
 
-*Format:*
-Kirim URL saja → Random code
-`https://example.com/long/url`
+Setelah kirim URL, kamu bisa pilih:
+• Random code (otomatis)
+• Custom alias (pilih sendiri)
 
-Kirim URL + spasi + alias → Custom alias
-`https://example.com myalias`
-
-*Contoh:*
-`https://forms.google.com/form/123456`
-Hasil: `{subdomain}.{default_domain}/abc123`
-
-atau dengan alias:
-`https://forms.google.com/form/123456 FormDaftar`
-Hasil: `{subdomain}.{default_domain}/FormDaftar`
-
-━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 Ketik /cancel untuk batal
         """
         context.user_data['state'] = 'waiting_shortlink_default'
@@ -161,6 +173,142 @@ Silakan pilih opsi lain:
     await query.edit_message_text(
         message,
         reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def handle_alias_random(query, context: ContextTypes.DEFAULT_TYPE):
+    """User pilih random code - langsung generate short link"""
+    url = context.user_data.get('pending_url')
+    
+    if not url:
+        await query.edit_message_text(
+            "❌ Error: URL tidak ditemukan. Silakan mulai lagi dari /start",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")
+            ]])
+        )
+        return
+    
+    user_id = str(query.from_user.id)
+    
+    await query.edit_message_text(
+        "⏳ Sedang membuat short link dengan random code...",
+        parse_mode='Markdown'
+    )
+    
+    try:
+        # Create short link dengan random code (no custom alias)
+        result = db.create_short_link(
+            original_url=url,
+            custom_alias=None,  # Random code
+            domain='default',
+            user_id=user_id
+        )
+        
+        if result['success']:
+            domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
+            short_code = result['short_code']
+            short_url = f"https://{domain_name}/{short_code}"
+            
+            url_preview = url if len(url) <= 50 else url[:47] + "..."
+            
+            message = f"""
+✅ *Short Link Berhasil Dibuat!*
+
+━━━━━━━━━━━━━━━━━
+🔗 *Short URL:*
+`{short_url}`
+
+📊 *Original URL:*
+{url_preview}
+
+🎲 *Code:* `{short_code}` (Random)
+
+━━━━━━━━━━━━━━━━━
+✨ Link sudah siap digunakan!
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")]
+            ]
+            
+            await query.edit_message_text(
+                message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+        else:
+            await query.edit_message_text(
+                f"❌ Gagal membuat short link!\n\n{result.get('error', 'Unknown error')}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")
+                ]])
+            )
+    
+    except Exception as e:
+        await query.edit_message_text(
+            f"❌ Error: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")
+            ]])
+        )
+    
+    # Clear state
+    context.user_data['state'] = None
+    context.user_data['pending_url'] = None
+
+async def handle_alias_custom(query, context: ContextTypes.DEFAULT_TYPE):
+    """User pilih custom alias - minta input alias"""
+    url = context.user_data.get('pending_url')
+    
+    if not url:
+        await query.edit_message_text(
+            "❌ Error: URL tidak ditemukan. Silakan mulai lagi dari /start",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")
+            ]])
+        )
+        return
+    
+    url_preview = url if len(url) <= 50 else url[:47] + "..."
+    
+    message = f"""
+✏️ *Custom Alias*
+
+━━━━━━━━━━━━━━━━━
+📌 *URL:*
+{url_preview}
+
+━━━━━━━━━━━━━━━━━
+
+Silakan kirim alias yang Anda inginkan.
+
+*Contoh:*
+• `googlejhosua`
+• `FormDaftar`
+• `LinkBioKu`
+
+*Hasil:*
+`s.jhopan.my.id/googlejhosua`
+
+*Aturan:*
+• Minimal 3 karakter
+• Hanya huruf, angka, - dan _
+• Belum dipakai user lain
+
+━━━━━━━━━━━━━━━━━
+Ketik /cancel untuk batal
+    """
+    
+    context.user_data['state'] = 'waiting_custom_alias'
+    
+    keyboard = [
+        [InlineKeyboardButton("❌ Cancel", callback_data="back_to_main")]
+    ]
+    
+    await query.edit_message_text(
+        message,
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='Markdown'
     )
 

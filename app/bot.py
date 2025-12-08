@@ -8,6 +8,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters
 )
+from telegram.request import HTTPXRequest
 from config.config import Config
 from src.handlers import (
     start_command,
@@ -33,8 +34,35 @@ class TelegramBot:
         # Validate config
         Config.validate()
         
-        # Create application
-        self.application = Application.builder().token(Config.BOT_TOKEN).build()
+        # Check if proxy is configured
+        try:
+            from config.proxy import PROXY_URL
+            proxy_url = PROXY_URL
+        except ImportError:
+            proxy_url = None
+        
+        # Create request object with or without proxy
+        if proxy_url:
+            print(f"🔒 Using proxy: {proxy_url}")
+            request = HTTPXRequest(
+                proxy=proxy_url,
+                connection_pool_size=8,
+                connect_timeout=30.0,
+                read_timeout=30.0
+            )
+        else:
+            # Create request with longer timeout
+            request = HTTPXRequest(
+                connection_pool_size=8,
+                connect_timeout=30.0,
+                read_timeout=30.0
+            )
+        
+        # Create application with request config
+        self.application = Application.builder()\
+            .token(Config.BOT_TOKEN)\
+            .request(request)\
+            .build()
         
         # Setup handlers
         self._setup_handlers()

@@ -69,6 +69,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Route based on state
     if user_state == 'waiting_shortlink_default':
         await process_shortlink_default(update, context, text)
+    elif user_state == 'waiting_custom_alias':
+        await process_custom_alias(update, context, text)
     elif user_state == 'waiting_shortlink_tinyurl':
         await process_shortlink_tinyurl(update, context, text)
     elif user_state == 'waiting_subdomain_request':
@@ -93,42 +95,109 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
 
 async def process_shortlink_default(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    """Process short link dengan default domain"""
-    # Parse input: URL atau URL + alias
-    parts = text.split(maxsplit=1)
-    url = parts[0]
-    custom_alias = parts[1] if len(parts) > 1 else None
+    """Process short link dengan default domain - step 1: terima URL, tampilkan pilihan"""
+    url = text.strip()
     
     # Validate URL
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     
+    # Simpan URL ke context
+    context.user_data['pending_url'] = url
+    context.user_data['state'] = 'choosing_alias_type'
+    
+    # Tampilkan pilihan: Random atau Custom
+    keyboard = [
+        [
+            InlineKeyboardButton("🎲 Random Code", callback_data="alias_random"),
+            InlineKeyboardButton("✏️ Custom Alias", callback_data="alias_custom")
+        ],
+        [
+            InlineKeyboardButton("❌ Cancel", callback_data="back_to_main")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Tampilkan preview URL dan pilihan
+    url_preview = url if len(url) <= 60 else url[:57] + "..."
+    message = f"""
+🔗 *URL Diterima!*
+
+`{url_preview}`
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+*Pilih jenis short link:*
+
+🎲 *Random Code*
+   Generate code otomatis
+   Contoh: `s.jhopan.my.id/abc123`
+
+✏️ *Custom Alias*
+   Pilih alias sendiri
+   Contoh: `s.jhopan.my.id/googlejhosua`
+
+━━━━━━━━━━━━━━━━━━━━━━
+Pilih salah satu tombol di atas
+    """
+    
+    await update.message.reply_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def process_custom_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process custom alias input dan buat short link"""
+    alias = text.strip()
+    url = context.user_data.get('pending_url')
+    
+    if not url:
+        await update.message.reply_text(
+            "❌ Error: URL tidak ditemukan. Silakan mulai lagi.",
+            reply_markup=get_back_button()
+        )
+        return
+    
+    # Validate alias format
+    if len(alias) < 3:
+        await update.message.reply_text(
+            "❌ Alias terlalu pendek! Minimal 3 karakter.\n\nSilakan coba lagi:",
+            reply_markup=get_back_button()
+        )
+        return
+    
+    if not re.match(r'^[a-zA-Z0-9_-]+$', alias):
+        await update.message.reply_text(
+            "❌ Alias hanya boleh mengandung huruf, angka, - dan _\n\nSilakan coba lagi:",
+            reply_markup=get_back_button()
+        )
+        return
+    
     user_id = str(update.effective_user.id)
     
     processing_msg = await update.message.reply_text(
-        "⏳ Sedang membuat short link...",
+        "⏳ Sedang membuat short link dengan custom alias...",
         parse_mode='Markdown'
     )
     
     try:
-        # Check if web server is running
-        web_server_online = await check_web_server_status()
+        # Create short link dengan custom alias
+        result = db.create_short_link(
+            original_url=url,
+            custom_alias=alias,
+            domain='default',
+            user_id=user_id
+        )
         
-        if web_server_online and Config.DEFAULT_DOMAIN:
-            # Use custom domain (primary)
-            result = db.create_short_link(
-                original_url=url,
-                custom_alias=custom_alias,
-                domain='default',
-                user_id=user_id
-            )
+        if result['success']:
+            domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
+            short_code = result['custom_alias']
+            short_url = f"https://{domain_name}/{short_code}"
             
-            if result['success']:
-                domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
-                short_code = result['custom_alias'] or result['short_code']
-                short_url = f"https://{domain_name}/{short_code}"
-                
-                message = f"""
+            url_preview = url if len(url) <= 50 else url[:47] + "..."
+            
+            message = f"""
 ✅ *Short Link Berhasil Dibuat!*
 
 ━━━━━━━━━━━━━━━━━
@@ -136,30 +205,26 @@ async def process_shortlink_default(update: Update, context: ContextTypes.DEFAUL
 `{short_url}`
 
 📊 *Original URL:*
-{url[:50]}{"..." if len(url) > 50 else ""}
+{url_preview}
+
+✏️ *Alias:* `{short_code}` (Custom)
 
 ━━━━━━━━━━━━━━━━━
 ✨ Link sudah siap digunakan!
-Klik link untuk test redirect.
-                """
-                
-                await processing_msg.edit_text(
-                    message,
-                    parse_mode='Markdown',
-                    reply_markup=get_back_button()
-                )
-            else:
-                await processing_msg.edit_text(
-                    f"❌ Gagal membuat short link!\n\n{result.get('error', 'Unknown error')}",
-                    reply_markup=get_back_button()
-                )
-        else:
-            # Fallback to TinyURL
+            """
+            
             await processing_msg.edit_text(
-                "⚠️ Default domain tidak tersedia.\n\n"
-                "Gunakan TinyURL atau hubungi admin untuk custom domain.",
+                message,
+                parse_mode='Markdown',
                 reply_markup=get_back_button()
             )
+        else:
+            error_msg = result.get('error', 'Unknown error')
+            await processing_msg.edit_text(
+                f"❌ Gagal membuat short link!\n\n{error_msg}\n\nSilakan coba alias lain:",
+                reply_markup=get_back_button()
+            )
+            return  # Don't clear state, biar bisa coba lagi
     
     except Exception as e:
         await processing_msg.edit_text(
@@ -169,6 +234,7 @@ Klik link untuk test redirect.
     
     # Clear state
     context.user_data['state'] = None
+    context.user_data['pending_url'] = None
 
 async def process_shortlink_tinyurl(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     """Process short link dengan TinyURL"""
@@ -189,6 +255,7 @@ async def process_shortlink_tinyurl(update: Update, context: ContextTypes.DEFAUL
         short_url = shortlink_gen.create_tinyurl(url, custom_alias)
         
         if short_url:
+            url_preview = url if len(url) <= 60 else url[:57] + "..."
             message = f"""
 ✅ *Short Link Berhasil Dibuat!*
 
@@ -196,8 +263,8 @@ async def process_shortlink_tinyurl(update: Update, context: ContextTypes.DEFAUL
 🔗 *Short URL (TinyURL):*
 `{short_url}`
 
-📊 *Original URL:*
-{url[:50]}{"..." if len(url) > 50 else ""}
+📏 *Original URL:*
+`{url_preview}`
 
 ━━━━━━━━━━━━━━━━━
 📱 Link via TinyURL.com
@@ -234,12 +301,13 @@ async def process_qr_input(update: Update, context: ContextTypes.DEFAULT_TYPE, t
         qr_image = qr_gen.generate(text)
         
         if qr_image:
+            text_preview = text if len(text) <= 100 else text[:97] + "..."
             caption = f"""
 ✅ *QR Code Berhasil Dibuat!*
 
 ━━━━━━━━━━━━━━━━━
 📱 *Content:*
-{text[:100]}{"..." if len(text) > 100 else ""}
+`{text_preview}`
 
 ━━━━━━━━━━━━━━━━━
 Scan QR code untuk akses content.
@@ -325,6 +393,7 @@ async def process_both_input(update: Update, context: ContextTypes.DEFAULT_TYPE,
         qr_image = qr_gen.generate(short_url)
         
         if qr_image:
+            url_preview = url if len(url) <= 60 else url[:57] + "..."
             caption = f"""
 ✅ *Short Link + QR Code Berhasil Dibuat!*
 
@@ -333,7 +402,7 @@ async def process_both_input(update: Update, context: ContextTypes.DEFAULT_TYPE,
 `{short_url}`
 
 📊 *Original URL:*
-{url[:50]}{"..." if len(url) > 50 else ""}
+`{url_preview}`
 
 ━━━━━━━━━━━━━━━━━
 📱 Scan QR code untuk akses link.
