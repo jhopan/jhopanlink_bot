@@ -338,18 +338,6 @@ Klik "📩 Hubungi Admin" untuk bantuan!
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
-• Proses setup 1-2 hari kerja
-• Include SSL/TLS certificate
-• Full analytics & tracking
-
-Klik tombol "📩 Hubungi Admin" untuk request!
-    """
-    
-    await query.edit_message_text(
-        message,
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
 
 async def handle_shortlink_tinyurl(query, context: ContextTypes.DEFAULT_TYPE):
     """User pilih TinyURL"""
