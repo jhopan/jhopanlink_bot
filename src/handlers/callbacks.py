@@ -277,7 +277,7 @@ async def handle_alias_custom(query, context: ContextTypes.DEFAULT_TYPE):
 
 ━━━━━━━━━━━━━━━━━
 📌 *URL:*
-{url_preview}
+`{url_preview}`
 
 ━━━━━━━━━━━━━━━━━
 
