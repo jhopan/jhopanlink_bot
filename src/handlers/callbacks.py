@@ -26,6 +26,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_shortlink_default(query, context)
     elif callback_data == "shortlink_custom":
         await handle_shortlink_custom(query, context)
+    elif callback_data == "request_subdomain":
+        await handle_request_subdomain(query, context)
+    elif callback_data == "custom_domain_own":
+        await handle_custom_domain_own(query, context)
     elif callback_data == "shortlink_tinyurl":
         await handle_shortlink_tinyurl(query, context)
     elif callback_data == "menu_qr":
@@ -115,8 +119,13 @@ async def handle_shortlink_default(query, context: ContextTypes.DEFAULT_TYPE):
         message = f"""
 🌐 *Short Link - Default Domain*
 
+━━━━━━━━━━━━━━━━━
+📍 *Subdomain Aktif:* `{subdomain}`
+🌐 *Domain:* `{default_domain}`
+🔗 *Full URL:* `{subdomain}.{default_domain}`
+
+━━━━━━━━━━━━━━━━━
 Silakan kirim URL yang ingin diperpendek.
-Link akan dibuat dengan domain: `{subdomain}.{default_domain}`
 
 *Format:*
 Kirim URL saja → Random code
@@ -156,39 +165,179 @@ Silakan pilih opsi lain:
     )
 
 async def handle_shortlink_custom(query, context: ContextTypes.DEFAULT_TYPE):
-    """User mau pakai custom domain - perlu hubungi admin"""
+    """User mau pakai custom domain - bisa request subdomain atau custom domain"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🎁 Request Subdomain Gratis", callback_data="request_subdomain")
+        ],
+        [
+            InlineKeyboardButton("🌐 Pakai Domain Sendiri", callback_data="custom_domain_own")
+        ],
+        [
+            InlineKeyboardButton("📩 Hubungi Admin", url="https://t.me/jhopan_05")
+        ],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data="menu_shortlink")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    default_domain = Config.DEFAULT_DOMAIN if Config.DEFAULT_DOMAIN else "jhopan.my.id"
+    
+    message = f"""
+🎯 *Custom Domain / Subdomain*
+
+━━━━━━━━━━━━━━━━━
+*Pilihan Tersedia:*
+
+🎁 *Subdomain Gratis*
+   Format: `nama-anda.{default_domain}`
+   • Gratis selamanya
+   • Setup 1-2 hari
+   • SSL/TLS included
+
+🌐 *Custom Domain Sendiri*
+   Format: `link.domain-anda.com`
+   • Pakai domain sendiri
+   • Butuh akses Cloudflare
+
+━━━━━━━━━━━━━━━━━
+👤 *Admin:* @jhopan_05
+
+💡 *Note:*
+Subdomain gratis unlimited via Cloudflare!
+
+Pilih opsi di bawah untuk melanjutkan:
+    """
+    
+    await query.edit_message_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def handle_request_subdomain(query, context: ContextTypes.DEFAULT_TYPE):
+    """Handle request subdomain gratis"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 Back", callback_data="shortlink_custom")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    default_domain = Config.DEFAULT_DOMAIN if Config.DEFAULT_DOMAIN else "jhopan.my.id"
+    user_id = query.from_user.id
+    username = query.from_user.username or "User"
+    
+    message = f"""
+🎁 *Request Subdomain Gratis*
+
+━━━━━━━━━━━━━━━━━
+Silakan kirim nama subdomain yang Anda inginkan.
+
+*Format:*
+Hanya nama subdomain (tanpa domain utama)
+
+*Contoh:*
+`mybrand`  → `mybrand.{default_domain}`
+`linkku`   → `linkku.{default_domain}`
+`promo`    → `promo.{default_domain}`
+
+━━━━━━━━━━━━━━━━━
+*Rules:*
+• Huruf kecil saja (a-z)
+• Boleh angka (0-9)
+• Boleh tanda hubung (-)
+• Minimal 3 karakter
+• Maksimal 20 karakter
+
+*Contoh VALID:*
+✅ `mylink`
+✅ `promo2024`
+✅ `my-brand`
+
+*Contoh TIDAK VALID:*
+❌ `MyLink` (ada huruf besar)
+❌ `my_link` (pakai underscore)
+❌ `ab` (terlalu pendek)
+
+━━━━━━━━━━━━━━━━━
+📩 *Request akan dikirim ke admin:*
+@jhopan_05
+
+Ketik /cancel untuk batal
+    """
+    
+    await query.edit_message_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    
+    # Set state untuk menunggu input subdomain
+    context.user_data['state'] = 'waiting_subdomain_request'
+    context.user_data['user_id'] = user_id
+    context.user_data['username'] = username
+
+async def handle_custom_domain_own(query, context: ContextTypes.DEFAULT_TYPE):
+    """Handle custom domain sendiri - perlu setup DNS"""
     keyboard = [
         [
             InlineKeyboardButton("📩 Hubungi Admin", url="https://t.me/jhopan_05")
         ],
         [
-            InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")
+            InlineKeyboardButton("🔙 Back", callback_data="shortlink_custom")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     message = """
-🎯 *Custom Domain / Subdomain*
-
-Untuk menggunakan custom domain atau subdomain gratis, hubungi admin:
+🌐 *Custom Domain Sendiri*
 
 ━━━━━━━━━━━━━━━━━
-👤 *Admin:* @jhopan_05
+Untuk menggunakan domain Anda sendiri, ikuti langkah berikut:
+
+*Persyaratan:*
+1️⃣ Punya domain sendiri (dari Namecheap, GoDaddy, dll)
+2️⃣ Domain sudah terhubung ke Cloudflare
+3️⃣ Akses ke dashboard Cloudflare
 
 ━━━━━━━━━━━━━━━━━
-*Pilihan Tersedia:*
+*Langkah Setup:*
 
-1️⃣ *Subdomain Gratis*
-   Pakai domain kami: `nama-anda.jhopan.my.id`
-   Gratis, setup oleh admin
-   
-2️⃣ *Custom Domain Sendiri*
-   Pakai domain Anda sendiri
-   Butuh setup DNS & Cloudflare
+*A. Setup DNS (di Cloudflare):*
+1. Login ke dashboard.cloudflare.com
+2. Pilih domain Anda
+3. Masuk ke menu "DNS" → "Records"
+4. Tambah record CNAME:
+   • Type: `CNAME`
+   • Name: `link` (atau subdomain lain)
+   • Target: `s.jhopan.my.id`
+   • Proxy: Enabled (orange cloud)
+5. Save
+
+*B. Hubungi Admin:*
+Kirim info berikut ke @jhopan_05:
+```
+Domain: link.domain-anda.com
+User ID: [akan otomatis]
+Tujuan: Short link bot
+```
 
 ━━━━━━━━━━━━━━━━━
-*Info:*
-• Subdomain gratis unlimited (via Cloudflare)
+*Estimasi Waktu:*
+• DNS propagation: 5-10 menit
+• Admin setup: 1-2 hari kerja
+
+*Biaya:*
+• Gratis (gunakan domain Anda)
+
+Klik "📩 Hubungi Admin" untuk bantuan!
+    """
+    
+    await query.edit_message_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 • Proses setup 1-2 hari kerja
 • Include SSL/TLS certificate
 • Full analytics & tracking

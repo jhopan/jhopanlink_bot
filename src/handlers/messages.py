@@ -71,6 +71,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await process_shortlink_default(update, context, text)
     elif user_state == 'waiting_shortlink_tinyurl':
         await process_shortlink_tinyurl(update, context, text)
+    elif user_state == 'waiting_subdomain_request':
+        await process_subdomain_request(update, context, text)
     elif user_state == 'waiting_qr_text':
         await process_qr_input(update, context, text)
     elif user_state == 'waiting_both_url':
@@ -354,6 +356,110 @@ async def process_both_input(update: Update, context: ContextTypes.DEFAULT_TYPE,
     except Exception as e:
         await processing_msg.edit_text(
             f"❌ Error: {str(e)}",
+            reply_markup=get_back_button()
+        )
+    
+    # Clear state
+    context.user_data['state'] = None
+
+async def process_subdomain_request(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process subdomain request - kirim ke admin"""
+    import re
+    from config.config import Config
+    
+    subdomain = text.lower().strip()
+    
+    # Validate subdomain format
+    if not re.match(r'^[a-z0-9-]{3,20}$', subdomain):
+        await update.message.reply_text(
+            "❌ *Subdomain tidak valid!*\n\n"
+            "*Rules:*\n"
+            "• Huruf kecil saja (a-z)\n"
+            "• Boleh angka (0-9)\n"
+            "• Boleh tanda hubung (-)\n"
+            "• Minimal 3 karakter\n"
+            "• Maksimal 20 karakter\n\n"
+            "*Contoh valid:* mylink, promo2024, my-brand\n\n"
+            "Silakan coba lagi atau ketik /cancel",
+            parse_mode='Markdown',
+            reply_markup=get_back_button()
+        )
+        return
+    
+    # Check jika subdomain sudah ada di database
+    existing = db.check_subdomain_exists(subdomain)
+    if existing:
+        await update.message.reply_text(
+            f"❌ *Subdomain sudah digunakan!*\n\n"
+            f"Subdomain `{subdomain}` sudah diambil oleh user lain.\n\n"
+            "Silakan pilih nama lain atau ketik /cancel",
+            parse_mode='Markdown',
+            reply_markup=get_back_button()
+        )
+        return
+    
+    # Get user info
+    user_id = context.user_data.get('user_id', update.effective_user.id)
+    username = context.user_data.get('username', update.effective_user.username or "User")
+    user_full_name = update.effective_user.full_name
+    default_domain = Config.DEFAULT_DOMAIN if Config.DEFAULT_DOMAIN else "jhopan.my.id"
+    
+    # Kirim notifikasi ke admin
+    from src.handlers.admin import ADMIN_ID
+    
+    admin_message = f"""
+🎁 *SUBDOMAIN REQUEST*
+
+━━━━━━━━━━━━━━━━━
+👤 *User Info:*
+• Name: {user_full_name}
+• Username: @{username}
+• User ID: `{user_id}`
+
+━━━━━━━━━━━━━━━━━
+🌐 *Subdomain Request:*
+• Subdomain: `{subdomain}`
+• Full Domain: `{subdomain}.{default_domain}`
+
+━━━━━━━━━━━━━━━━━
+*Action Required:*
+1. Setup DNS CNAME di Cloudflare
+2. Tambah ke Cloudflare Tunnel config
+3. Inform user setelah setup selesai
+
+*Command untuk approve:*
+`/approve_subdomain {subdomain} {user_id}`
+    """
+    
+    try:
+        # Kirim ke admin via bot
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=admin_message,
+            parse_mode='Markdown'
+        )
+        
+        # Confirm ke user
+        await update.message.reply_text(
+            f"✅ *Request Berhasil Dikirim!*\n\n"
+            f"━━━━━━━━━━━━━━━━━\n"
+            f"🌐 *Subdomain:* `{subdomain}.{default_domain}`\n\n"
+            f"📩 *Status:* Menunggu approval admin\n\n"
+            f"━━━━━━━━━━━━━━━━━\n"
+            f"*Next Steps:*\n"
+            f"1. Admin akan setup subdomain Anda\n"
+            f"2. Proses setup: 1-2 hari kerja\n"
+            f"3. Anda akan diinfokan saat sudah siap\n\n"
+            f"💡 *Tip:* Hubungi @jhopan_05 jika urgent!",
+            parse_mode='Markdown',
+            reply_markup=get_back_button()
+        )
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Gagal mengirim request ke admin!\n\n"
+            f"Silakan hubungi admin langsung: @jhopan_05\n\n"
+            f"Info subdomain: `{subdomain}.{default_domain}`",
+            parse_mode='Markdown',
             reply_markup=get_back_button()
         )
     

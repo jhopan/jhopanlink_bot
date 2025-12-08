@@ -480,3 +480,18 @@ class DatabaseManager:
         
         conn.close()
         return users
+    
+    def check_subdomain_exists(self, subdomain: str) -> bool:
+        """Check if subdomain already exists"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Check in custom_domains table
+        cursor.execute('''
+            SELECT COUNT(*) FROM custom_domains
+            WHERE domain LIKE ?
+        ''', (f"{subdomain}.%",))
+        
+        result = cursor.fetchone()[0] > 0
+        conn.close()
+        return result
