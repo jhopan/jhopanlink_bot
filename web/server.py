@@ -270,14 +270,18 @@ def redirect_link(short_code):
     # Get domain dari request
     domain = get_domain_from_request()
     
+    print(f"🔍 Redirect request: domain={domain}, code={short_code}")
+    
     # Get link dari database
     link = db.get_link_by_code(short_code, domain)
     
     if not link:
         # Coba dengan default domain
+        print(f"   Trying with default domain...")
         link = db.get_link_by_code(short_code, 'default')
     
     if link:
+        print(f"✅ Link found: {link['original_url']}")
         # Log click dengan info
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
         user_agent = request.headers.get('User-Agent', '')
@@ -295,6 +299,7 @@ def redirect_link(short_code):
         return redirect(link['original_url'], code=302)
     else:
         # Link tidak ditemukan
+        print(f"❌ Link not found: domain={domain}, code={short_code}")
         return render_template_string(NOT_FOUND_TEMPLATE), 404
 
 @app.route('/api/health')

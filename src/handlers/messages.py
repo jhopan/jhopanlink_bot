@@ -130,12 +130,14 @@ async def process_shortlink_default(update: Update, context: ContextTypes.DEFAUL
 *Pilih jenis short link:*
 
 🎲 *Random Code*
-   Generate code otomatis
-   Contoh: `s.jhopan.my.id/abc123`
+Generate code otomatis
+Contoh:
+`s.jhopan.my.id/abc123`
 
 ✏️ *Custom Alias*
-   Pilih alias sendiri
-   Contoh: `s.jhopan.my.id/googlejhosua`
+Pilih alias sendiri
+Contoh:
+`s.jhopan.my.id/googlejhosua`
 
 ━━━━━━━━━━━━━━━━━━━━━━
 Pilih salah satu tombol di atas
