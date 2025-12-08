@@ -14,6 +14,7 @@ Bot Telegram yang menyediakan layanan **short link dengan custom domain** dan **
 ## ⭐ Fitur Utama
 
 - 🔗 **Custom Short Link** - Domain sendiri (contoh: `s.jhopan.id/DaftarPMK`)
+- 🔄 **Smart Fallback** - Otomatis pakai TinyURL jika web server mati
 - 🎨 **Custom Alias** - Buat link yang mudah diingat
 - 🌐 **Multi Domain** - Support domain custom dari user lain
 - 📱 **QR Code Generator** - High quality QR codes dengan logo
@@ -21,6 +22,7 @@ Bot Telegram yang menyediakan layanan **short link dengan custom domain** dan **
 - 👤 **Personal Dashboard** - Lihat semua link & statistik Anda
 - 🔒 **Privacy First** - Data tersimpan lokal di server Anda sendiri
 - 💰 **100% Gratis** - Self-hosted dengan Cloudflare Tunnel gratis
+- 🚀 **Easy Setup** - Script install otomatis dengan guided setup
 
 ---
 
@@ -319,10 +321,40 @@ SQLite database dengan 3 tabel:
 
 ---
 
+## 🔄 Smart Fallback System
+
+Bot ini punya sistem fallback otomatis untuk memastikan short link tetap berfungsi:
+
+### Primary: Custom Domain (s.jhopan.id)
+- ✅ Link pakai domain sendiri
+- ✅ Full control & analytics
+- ✅ Custom alias support
+- ✅ No dependency ke third-party
+
+### Fallback: TinyURL (Automatic)
+- 🔄 Aktif ketika web server mati
+- 🔄 Bot auto-detect server status
+- 🔄 Transparent untuk user
+- ⚠️ Link jadi `tinyurl.com/xxx`
+
+**Flow:**
+```
+User → Bot → Check Web Server
+              ├─ ✅ Online  → s.jhopan.id/xxx (Primary)
+              └─ ❌ Offline → tinyurl.com/xxx (Fallback)
+```
+
+**Setup TinyURL API Key (Optional):**
+1. Daftar gratis di: https://tinyurl.com/app/dev
+2. Dapatkan API key
+3. Tambahkan ke `.env`: `TINYURL_API_KEY=your_key`
+
+---
+
 ## 🔒 Security & Privacy
 
 - ✅ **Data Ownership** - Semua data di server Anda sendiri
-- ✅ **No Third-Party** - Tidak menggunakan layanan pihak ketiga
+- ✅ **Smart Fallback** - Tetap berfungsi meski server down
 - ✅ **SSL/TLS** - Automatic HTTPS via Cloudflare
 - ✅ **Private Logs** - Click analytics tersimpan lokal
 - ✅ **No Tracking** - Tidak ada tracking eksternal
