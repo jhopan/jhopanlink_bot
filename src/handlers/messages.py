@@ -1,7 +1,7 @@
 """
 Message handlers untuk bot
 """
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from src.utils import QRCodeGenerator, ShortLinkGenerator
 from config.config import Config
@@ -47,34 +47,52 @@ def is_url(text: str) -> bool:
     
     return re.match(url_pattern, text) is not None
 
-async def short_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handler untuk command /short
+def get_back_button():
+    """Return back to main menu button"""
+    keyboard = [[InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_main")]]
+    return InlineKeyboardMarkup(keyboard)
+
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle text messages based on user state"""
+    text = update.message.text.strip()
+    user_state = context.user_data.get('state')
     
-    Format:
-    /short <URL> - Generate random short code
-    /short <URL> <alias> - Custom alias
-    /short <URL> <alias> <domain> - Custom alias dengan domain spesifik
-    """
-    if not context.args:
+    # Cancel command
+    if text.lower() == '/cancel':
+        context.user_data['state'] = None
         await update.message.reply_text(
-            "❌ *Format salah!*\n\n"
-            "*Gunakan:*\n"
-            "`/short <URL>` - Random short code\n"
-            "`/short <URL> <alias>` - Custom alias\n"
-            "`/short <URL> <alias> <domain>` - Dengan domain custom\n\n"
-            "*Contoh:*\n"
-            "`/short https://example.com/very/long/url`\n"
-            "`/short https://forms.google.com DaftarPengurus2025`\n"
-            "`/short https://forms.google.com pmkft/DaftarPengurus jhopan.id`",
-            parse_mode='Markdown'
+            "❌ Operasi dibatalkan.\n\nKetik /start untuk kembali ke menu utama.",
+            reply_markup=get_back_button()
         )
         return
     
-    # Parse arguments
-    url = context.args[0]
-    custom_alias = context.args[1] if len(context.args) > 1 else None
-    custom_domain = context.args[2] if len(context.args) > 2 else 'default'
+    # Route based on state
+    if user_state == 'waiting_shortlink_url':
+        await process_shortlink_input(update, context, text)
+    elif user_state == 'waiting_qr_text':
+        await process_qr_input(update, context, text)
+    elif user_state == 'waiting_both_url':
+        await process_both_input(update, context, text)
+    elif user_state == 'waiting_domain':
+        await process_domain_input(update, context, text)
+    else:
+        # Default: auto-detect URL
+        if is_url(text):
+            context.user_data['state'] = 'waiting_shortlink_url'
+            await process_shortlink_input(update, context, text)
+        else:
+            await update.message.reply_text(
+                "❓ Tidak mengerti perintah Anda.\n\n"
+                "Ketik /start untuk melihat menu atau kirim URL untuk membuat short link.",
+                reply_markup=get_back_button()
+            )
+
+async def process_shortlink_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process short link creation from user input"""
+    # Parse input: URL atau URL + alias
+    parts = text.split(maxsplit=1)
+    url = parts[0]
+    custom_alias = parts[1] if len(parts) > 1 else None
     
     # Validate URL
     if not url.startswith(('http://', 'https://')):
@@ -92,69 +110,286 @@ async def short_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Check if web server is running
         web_server_online = await check_web_server_status()
         
-        if web_server_online:
+        if web_server_online and Config.DEFAULT_DOMAIN:
             # Use custom domain (primary)
             result = db.create_short_link(
                 original_url=url,
                 custom_alias=custom_alias,
-                domain=custom_domain,
+                domain='default',
                 user_id=user_id
             )
             
             if result['success']:
-                # Build short URL
-                if custom_domain == 'default':
-                    domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
-                else:
-                    domain_name = custom_domain
-                
+                domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
                 short_code = result['custom_alias'] or result['short_code']
                 short_url = f"https://{domain_name}/{short_code}"
                 
+                message = f"""
+✅ *Short Link Berhasil Dibuat!*
+
+━━━━━━━━━━━━━━━━━
+🔗 *Short URL:*
+`{short_url}`
+
+📊 *Original URL:*
+{url[:50]}{"..." if len(url) > 50 else ""}
+
+━━━━━━━━━━━━━━━━━
+✨ Link sudah siap digunakan!
+Klik link untuk test redirect.
+                """
+                
                 await processing_msg.edit_text(
-                    "✅ *Short Link berhasil dibuat!*\n\n"
-                    f"🔗 *URL Asli:*\n`{url[:60]}{'...' if len(url) > 60 else ''}`\n\n"
-                    f"✨ *Short Link:*\n`{short_url}`\n\n"
-                    f"📊 *Stats:* 0 clicks\n\n"
-                    "━━━━━━━━━━━━━━━━━\n"
-                    "💡 *Tip:* Gunakan `/mystats` untuk lihat semua link Anda!",
-                    parse_mode='Markdown'
+                    message,
+                    parse_mode='Markdown',
+                    reply_markup=get_back_button()
                 )
             else:
                 await processing_msg.edit_text(
-                    f"❌ *Gagal membuat short link!*\n\n"
-                    f"Error: {result.get('error', 'Unknown error')}\n\n"
-                    "Silakan coba alias lain atau hubungi admin.",
-                    parse_mode='Markdown'
+                    f"❌ Gagal membuat short link!\n\n{result.get('error', 'Unknown error')}",
+                    reply_markup=get_back_button()
                 )
         else:
             # Fallback to TinyURL
-            short_gen = ShortLinkGenerator()
-            short_url = await short_gen.shorten(url, custom_alias)
+            shortlink_gen = ShortLinkGenerator()
+            short_url = shortlink_gen.create_tinyurl(url, custom_alias)
             
             if short_url:
+                message = f"""
+✅ *Short Link Berhasil Dibuat!*
+
+━━━━━━━━━━━━━━━━━
+🔗 *Short URL (TinyURL):*
+`{short_url}`
+
+📊 *Original URL:*
+{url[:50]}{"..." if len(url) > 50 else ""}
+
+━━━━━━━━━━━━━━━━━
+⚠️ *Note:* Web server offline, menggunakan TinyURL fallback
+                """
+                
                 await processing_msg.edit_text(
-                    "✅ *Short Link berhasil dibuat (via TinyURL)!*\n\n"
-                    f"🔗 *URL Asli:*\n`{url[:60]}{'...' if len(url) > 60 else ''}`\n\n"
-                    f"✨ *Short Link:*\n`{short_url}`\n\n"
-                    "⚠️ *Note:* Web server sedang offline, menggunakan TinyURL sebagai backup.\n\n"
-                    "━━━━━━━━━━━━━━━━━\n"
-                    "💡 Hubungi admin untuk mengaktifkan domain custom!",
-                    parse_mode='Markdown'
+                    message,
+                    parse_mode='Markdown',
+                    reply_markup=get_back_button()
                 )
             else:
                 await processing_msg.edit_text(
-                    "❌ *Gagal membuat short link!*\n\n"
-                    "Web server offline dan TinyURL juga gagal.\n"
-                    "Silakan coba lagi nanti atau hubungi admin.",
-                    parse_mode='Markdown'
+                    "❌ Gagal membuat short link dengan TinyURL!",
+                    reply_markup=get_back_button()
                 )
     
     except Exception as e:
         await processing_msg.edit_text(
-            f"❌ *Error:* {str(e)}\n\n"
-            "Silakan coba lagi!",
-            parse_mode='Markdown'
+            f"❌ Error: {str(e)}",
+            reply_markup=get_back_button()
+        )
+    
+    # Clear state
+    context.user_data['state'] = None
+
+async def process_qr_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process QR code generation from user input"""
+    processing_msg = await update.message.reply_text(
+        "⏳ Sedang membuat QR Code...",
+        parse_mode='Markdown'
+    )
+    
+    try:
+        # Generate QR code
+        qr_image = qr_gen.generate(text)
+        
+        if qr_image:
+            caption = f"""
+✅ *QR Code Berhasil Dibuat!*
+
+━━━━━━━━━━━━━━━━━
+📱 *Content:*
+{text[:100]}{"..." if len(text) > 100 else ""}
+
+━━━━━━━━━━━━━━━━━
+Scan QR code untuk akses content.
+            """
+            
+            await update.message.reply_photo(
+                photo=qr_image,
+                caption=caption,
+                parse_mode='Markdown',
+                reply_markup=get_back_button()
+            )
+            
+            await processing_msg.delete()
+        else:
+            await processing_msg.edit_text(
+                "❌ Gagal membuat QR Code!",
+                reply_markup=get_back_button()
+            )
+    
+    except Exception as e:
+        await processing_msg.edit_text(
+            f"❌ Error: {str(e)}",
+            reply_markup=get_back_button()
+        )
+    
+    # Clear state
+    context.user_data['state'] = None
+
+async def process_both_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process short link + QR code creation"""
+    # Parse input
+    parts = text.split(maxsplit=1)
+    url = parts[0]
+    custom_alias = parts[1] if len(parts) > 1 else None
+    
+    # Validate URL
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    
+    user_id = str(update.effective_user.id)
+    
+    processing_msg = await update.message.reply_text(
+        "⏳ Sedang membuat short link + QR code...",
+        parse_mode='Markdown'
+    )
+    
+    try:
+        # Check web server
+        web_server_online = await check_web_server_status()
+        
+        if web_server_online and Config.DEFAULT_DOMAIN:
+            # Create short link
+            result = db.create_short_link(
+                original_url=url,
+                custom_alias=custom_alias,
+                domain='default',
+                user_id=user_id
+            )
+            
+            if result['success']:
+                domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
+                short_code = result['custom_alias'] or result['short_code']
+                short_url = f"https://{domain_name}/{short_code}"
+            else:
+                await processing_msg.edit_text(
+                    f"❌ Gagal membuat short link!\n\n{result.get('error', 'Unknown error')}",
+                    reply_markup=get_back_button()
+                )
+                return
+        else:
+            # Fallback to TinyURL
+            shortlink_gen = ShortLinkGenerator()
+            short_url = shortlink_gen.create_tinyurl(url, custom_alias)
+            
+            if not short_url:
+                await processing_msg.edit_text(
+                    "❌ Gagal membuat short link!",
+                    reply_markup=get_back_button()
+                )
+                return
+        
+        # Generate QR code for short URL
+        qr_image = qr_gen.generate(short_url)
+        
+        if qr_image:
+            caption = f"""
+✅ *Short Link + QR Code Berhasil Dibuat!*
+
+━━━━━━━━━━━━━━━━━
+🔗 *Short URL:*
+`{short_url}`
+
+📊 *Original URL:*
+{url[:50]}{"..." if len(url) > 50 else ""}
+
+━━━━━━━━━━━━━━━━━
+📱 Scan QR code untuk akses link.
+            """
+            
+            await update.message.reply_photo(
+                photo=qr_image,
+                caption=caption,
+                parse_mode='Markdown',
+                reply_markup=get_back_button()
+            )
+            
+            await processing_msg.delete()
+        else:
+            await processing_msg.edit_text(
+                "❌ Gagal membuat QR Code!",
+                reply_markup=get_back_button()
+            )
+    
+    except Exception as e:
+        await processing_msg.edit_text(
+            f"❌ Error: {str(e)}",
+            reply_markup=get_back_button()
+        )
+    
+    # Clear state
+    context.user_data['state'] = None
+
+async def process_domain_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Process custom domain addition"""
+    domain = text.lower().strip()
+    user_id = str(update.effective_user.id)
+    username = update.effective_user.username or "unknown"
+    
+    processing_msg = await update.message.reply_text(
+        "⏳ Menambahkan domain...",
+        parse_mode='Markdown'
+    )
+    
+    try:
+        result = db.add_custom_domain(domain, user_id, username)
+        
+        if result['success']:
+            message = f"""
+✅ *Domain Berhasil Ditambahkan!*
+
+━━━━━━━━━━━━━━━━━
+🌐 *Domain:* `{domain}`
+
+*Cara Pakai:*
+Saat membuat short link, tambahkan domain di akhir:
+`https://example.com myalias {domain}`
+
+Link akan jadi: `{domain}/myalias`
+            """
+            
+            await processing_msg.edit_text(
+                message,
+                parse_mode='Markdown',
+                reply_markup=get_back_button()
+            )
+        else:
+            await processing_msg.edit_text(
+                f"❌ Gagal menambahkan domain!\n\n{result.get('error', 'Unknown error')}",
+                reply_markup=get_back_button()
+            )
+    
+    except Exception as e:
+        await processing_msg.edit_text(
+            f"❌ Error: {str(e)}",
+            reply_markup=get_back_button()
+        )
+    
+    # Clear state
+    context.user_data['state'] = None
+
+# Old command handlers kept for backward compatibility (direct /command usage)
+async def short_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Legacy /short command - redirects to menu-based flow"""
+    if context.args:
+        # If arguments provided, process directly
+        text = ' '.join(context.args)
+        context.user_data['state'] = 'waiting_shortlink_url'
+        await process_shortlink_input(update, context, text)
+    else:
+        # Show usage
+        await update.message.reply_text(
+            "💡 Silakan kirim URL yang ingin diperpendek, atau gunakan /start untuk menu interaktif.",
+            reply_markup=get_back_button()
         )
 
 async def qr_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -290,87 +525,6 @@ async def both_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await processing_msg.edit_text(
             f"❌ *Error:* {str(e)}\n\n"
             "Silakan coba lagi!",
-            parse_mode='Markdown'
-        )
-
-async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk pesan teks biasa (auto-detect URL)"""
-    text = update.message.text.strip()
-    
-    # Check if it's a URL
-    if is_url(text) or text.startswith('www.'):
-        # Auto create short link
-        processing_msg = await update.message.reply_text(
-            "🔍 URL terdeteksi! Membuat short link...",
-            parse_mode='Markdown'
-        )
-        
-        try:
-            url = text if text.startswith(('http://', 'https://')) else 'https://' + text
-            user_id = str(update.effective_user.id)
-            
-            # Check if web server is running
-            web_server_online = await check_web_server_status()
-            
-            if web_server_online:
-                # Use custom domain
-                result = db.create_short_link(
-                    original_url=url,
-                    user_id=user_id
-                )
-                
-                if result['success']:
-                    domain_name = f"{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}"
-                    short_code = result['short_code']
-                    short_url = f"https://{domain_name}/{short_code}"
-                    
-                    await processing_msg.edit_text(
-                        "✅ *Short Link berhasil dibuat!*\n\n"
-                        f"🔗 *URL Asli:*\n`{text}`\n\n"
-                        f"✨ *Short Link:*\n`{short_url}`\n\n"
-                        "━━━━━━━━━━━━━━━━━\n"
-                        "💡 *Tip:* Gunakan `/both <URL>` untuk mendapatkan QR Code juga!",
-                        parse_mode='Markdown'
-                    )
-                else:
-                    raise Exception("Database error")
-            else:
-                # Fallback to TinyURL
-                short_gen = ShortLinkGenerator()
-                short_url = await short_gen.shorten(url)
-                
-                if short_url and short_url != url:
-                    await processing_msg.edit_text(
-                        "✅ *Short Link berhasil dibuat (via TinyURL)!*\n\n"
-                        f"🔗 *URL Asli:*\n`{text}`\n\n"
-                        f"✨ *Short Link:*\n`{short_url}`\n\n"
-                        "⚠️ *Note:* Web server offline, menggunakan backup.\n"
-                        "━━━━━━━━━━━━━━━━━\n"
-                        "💡 *Tip:* Gunakan `/both <URL>` untuk mendapatkan QR Code juga!",
-                        parse_mode='Markdown'
-                    )
-                else:
-                    await processing_msg.edit_text(
-                        "❌ Gagal membuat short link.\n\n"
-                        "Silakan coba lagi nanti.",
-                        parse_mode='Markdown'
-                    )
-        
-        except Exception as e:
-            await processing_msg.edit_text(
-                f"❌ *Error:* {str(e)}",
-                parse_mode='Markdown'
-            )
-    else:
-        # Not a URL
-        await update.message.reply_text(
-            "❓ *Perintah tidak dikenali*\n\n"
-            "Gunakan:\n"
-            "• `/short <URL>` - Membuat short link\n"
-            "• `/qr <teks>` - Membuat QR Code\n"
-            "• `/both <URL>` - Keduanya\n\n"
-            "Atau kirim URL langsung!\n\n"
-            "Ketik `/help` untuk bantuan lengkap.",
             parse_mode='Markdown'
         )
 

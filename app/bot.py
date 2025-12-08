@@ -5,6 +5,7 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters
 )
 from config.config import Config
@@ -21,6 +22,7 @@ from src.handlers import (
     handle_text_message,
     error_handler
 )
+from src.handlers.callbacks import button_callback
 
 class TelegramBot:
     """Kelas utama untuk Bot Telegram"""
@@ -52,6 +54,9 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("mylinks", mylinks_command))
         self.application.add_handler(CommandHandler("adddomain", adddomain_command))
         
+        # Callback query handler (untuk inline keyboard buttons)
+        self.application.add_handler(CallbackQueryHandler(button_callback))
+        
         # Message handler untuk text
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message)
@@ -69,7 +74,7 @@ class TelegramBot:
         
         # Start polling
         self.application.run_polling(
-            allowed_updates=["message"],
+            allowed_updates=["message", "callback_query"],
             drop_pending_updates=True
         )
     

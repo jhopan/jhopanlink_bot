@@ -1,7 +1,7 @@
 """
 Command handlers untuk bot
 """
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database.db_manager import DatabaseManager
 from config.config import Config
@@ -10,8 +10,29 @@ from config.config import Config
 db = DatabaseManager()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk command /start"""
-    welcome_message = f"""
+    """Handler untuk command /start dengan inline keyboard menu"""
+    
+    # Keyboard menu utama
+    keyboard = [
+        [
+            InlineKeyboardButton("🔗 Short Link", callback_data="menu_shortlink"),
+            InlineKeyboardButton("📱 QR Code", callback_data="menu_qr")
+        ],
+        [
+            InlineKeyboardButton("🔗📱 Short Link + QR", callback_data="menu_both")
+        ],
+        [
+            InlineKeyboardButton("📊 My Stats", callback_data="menu_stats"),
+            InlineKeyboardButton("📋 My Links", callback_data="menu_mylinks")
+        ],
+        [
+            InlineKeyboardButton("🌐 Add Domain", callback_data="menu_adddomain"),
+            InlineKeyboardButton("ℹ️ Help", callback_data="menu_help")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    welcome_message = """
 🤖 *Selamat datang di ShortLink & QR Code Bot!*
 
 Bot ini dapat membantu Anda:
@@ -22,33 +43,12 @@ Bot ini dapat membantu Anda:
 ✅ Analytics & tracking clicks
 
 📝 *Cara Penggunaan:*
-
-*Short Link (Random):*
-`/short https://example.com/very/long/url`
-
-*Short Link (Custom Alias):*
-`/short https://forms.google.com DaftarPengurus2025`
-→ Jadi: `{Config.DEFAULT_SUBDOMAIN}.{Config.DEFAULT_DOMAIN}/DaftarPengurus2025`
-
-*Dengan Domain Custom:*
-`/short https://forms.google.com pmkft/Daftar jhopan.id`
-
-*QR Code:*
-`/qr https://example.com`
-
-*Short Link + QR Code:*
-`/both https://example.com CustomName`
-
-*Lihat Stats & Link Anda:*
-`/mystats` - Lihat semua link Anda
-`/mylinks` - List link terbaru
-
-━━━━━━━━━━━━━━━━━
-Ketik `/help` untuk panduan lengkap! 🚀
+Pilih menu di bawah ini untuk mulai:
     """
     
     await update.message.reply_text(
         welcome_message,
+        reply_markup=reply_markup,
         parse_mode='Markdown'
     )
 
